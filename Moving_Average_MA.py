@@ -10,39 +10,50 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+raw = pd.read_csv('http://hilpisch.com/pyalgo_eikon_eod_data.csv',index_col=0, parse_dates=True).dropna() 
+data = pd.DataFrame(raw["GLD"])
+w = data["GLD"].to_numpy()
 
 
 
-def rolling(N,arreglo):
+def rolling(N, Array):
     """
     Basic rolling function similiar to pandas.DataFrame.rolling
-    N: Size of the moving window if a float is provided it would be
-    round to 
+    N: Size of the moving window if a float is provided it would be rounded
+    Array: Numpy array or pandas Series 
     """
-    lista=[0]
-    N = int(N)
-    #List with Nans 
-    moving_aves =  [np.nan]*(N-1)
+    if isinstance(Array, np.ndarray) or isinstance(Array, pd.Series):
+        lista=[0]
+        N = round(N)
+        #List with Nans 
+        moving_aves =  [np.nan]*(N-1)
     
-    for i, x in enumerate(arreglo, 1):
-        lista.append(lista[i-1] + x)
-        if i>=N:
-            try:
-                moving_ave = (lista[i] - lista[i-N])/N
-                moving_aves.append(moving_ave)
-            except:
-                moving_aves.append(np.nan)
-    return moving_aves
-
-
+        for i, x in enumerate(Array, 1):
+            lista.append(lista[i-1] + x)
+            if i>=N:
+                try:
+                    moving_ave = (lista[i] - lista[i-N])/N
+                    moving_aves.append(moving_ave)
+                except:
+                    moving_aves.append(np.nan)
+        return moving_aves
+    
+    else:
+        raise TypeError("Expected Array to be a numpy narray or panadas Series")
 
 def _MM(individual):
-    corta = individual[0]
-    larga = individual[1]
-    
 
-    a = rolling(corta, w)  
-    b = rolling(larga, w)  
+    """
+    Provides Moving Average calculation for Numpy array or Pandas Series 
+    between to time windows
+    """
+    #Individuals corresponding to varriables in MM
+    short = individual[0]
+    long = individual[1]
+    
+    #Rolling for short and long signal
+    a = rolling(short, w)  
+    b = rolling(long, w)  
             
     s = []
     e = []
@@ -72,21 +83,21 @@ def _MM(individual):
 
 def feasible(individual):
     """Feasibility function for the individual. Returns True if feasible False
-    otherwise."""
+    otherwise"""
     if 0 < individual[0] < 100 and 100< individual[1] <250 :
         return True
     
     return False
 
 
-#Constants
+#Constants (Change this values)
 Dimensions = 2
 Bound_low, Bound_up = 0,250
 
-Population_size = 300
+Population_size = 50
 P_crossover = 0.9
 P_mutation = 0.5
-Max_generations = 50
+Max_generations = 10
 Hall_of_fame_size = 30
 Crowding_factor = 20.0
 
@@ -95,7 +106,7 @@ Crowding_factor = 20.0
 
 toolbox = base.Toolbox()
 
-#Objectives
+#Objective -> Maximize
 
 creator.create("Fitness_Max", base.Fitness, weights=(1.0,))
 
@@ -107,7 +118,6 @@ def randomFloat(low, up):
     return [random.uniform(l, u) for l, u in zip([low] * Dimensions, [up] * Dimensions)]
 
 toolbox.register("attrFloat", randomFloat, Bound_low, Bound_up)
-
 
 #Create individual
 
@@ -121,12 +131,12 @@ toolbox.register("populationCreator", tools.initRepeat, list, toolbox.individual
 toolbox.register("evaluate", _MM)
 toolbox.decorate("evaluate", tools.DeltaPenalty(feasible, 0))
 
-#Values for operatos
+#Values for operators
 toolbox.register("select", tools.selTournament, tournsize=2)
 toolbox.register("mate", tools.cxSimulatedBinaryBounded, low=Bound_low, up=Bound_up, eta=Crowding_factor)
 toolbox.register("mutate", tools.mutPolynomialBounded, low=Bound_low, up=Bound_up, eta=Crowding_factor, indpb=1.0/Dimensions)
 
-
+#Genetic algorithm main flow 
 def main():
 
     #First Generation
@@ -146,8 +156,8 @@ def main():
 
     # print info for best solution found:
     best = hof.items[0]
-    print("-- Best Individuals = ", best)
-    print("-- Best Fitness = ", best.fitness.values[0])
+    print("-- Best Individuals = ", np.round(best))
+    print("-- Best Fitness = ", np.round(best.fitness.values[0],2))
 
     # extract statistics:
     minFitnessValues, meanFitnessValues = logbook.select("max", "avg")
@@ -161,7 +171,6 @@ def main():
     plt.title('Max and Average fitness over Generations')
 
     plt.show()
-
 
 if __name__ == "__main__":
     main()
